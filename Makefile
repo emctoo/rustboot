@@ -1,36 +1,26 @@
-CC=i386-elf-gcc
-LD=i386-elf-ld
-RUSTC=rustc
-NASM=nasm
-QEMU=qemu-system-i386
+# host machine is debian testing, x86-64, this makefile will generate image file for x86
+# to build: make 
+# to run: make run
 
 all: floppy.img
 
-.SUFFIXES:
-
-.SUFFIXES: .o .rs .asm
-
-.PHONY: clean run
-
-.rs.o:
-	$(RUSTC) -O --target i386-intel-linux --lib -o $@ -c $<
-
-.asm.o:
-	$(NASM) -f elf32 -o $@ $<
-
-main.rs: zero.rs
-
 floppy.img: loader.bin main.bin
-	cat $^ > $@
+	cat loader.bin main.bin > floppy.img
 
 loader.bin: loader.asm
-	$(NASM) -o $@ -f bin $<
+	nasm -o $@ $^
 
-main.bin: linker.ld runtime.o main.o
-	$(LD) -o $@ -T $^
+main.bin: runtime.o main.o
+	ld -T linker.ld -m elf_i386 -o $@ $^
+
+runtime.o: runtime.asm
+	nasm -f elf32 -o $@ $^
+
+main.o: main.rs
+	rustc -O --target i386-intel-linux --lib -o $@ -c $^
+
+clean: 
+	rm -f *.bin *.o *.img
 
 run: floppy.img
-	$(QEMU) -fda $<
-
-clean:
-	rm -f *.bin *.o *.img
+	qemu -fda $^
